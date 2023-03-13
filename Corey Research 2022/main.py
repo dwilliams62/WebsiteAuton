@@ -5,7 +5,7 @@ from scipy import ndimage
 #the class for the plot stuff
 class myPlot():
     def __init__(self):
-        self.image = plt.imread(r"C:\Users\cphil\Documents\GitHub\WebsiteAuton\Corey Research 2022\robot.png")
+        self.image = plt.imread(r"C:\Users\User\Documents\GitHub2\WebsiteAuton\Corey Research 2022\robot.png")
 
     def drawPlot(self, x, y, theta):
         imgX = 3
