@@ -36,6 +36,7 @@ class myPlot():
         plt.plot(x, y, "purple", label="trajectory", zorder=1)
         plt.show()
 
+#defines a class for setting and describing the target point
 class targetPoint():
     def __init__(self, x_, y_, theta_):
         if not (x_ is None or y_ is None or theta_ is None):
@@ -50,7 +51,7 @@ class targetPoint():
     def __str__(self):
         return str(self.x)+","+str(self.y)+","+str(self.theta)
 
-
+#does most of the computational work and all the math
 class Controller():
     #initializing variables
     def __init__(
@@ -75,13 +76,13 @@ class Controller():
         self.arrive_distance = arrive_distance
         return
 
-    #not sure
+    #not used at all
     def uniToDiff(self, v, w):
         vR = (2*v + w*self.L)/(2*self.R)
         vL = (2*v - w*self.L)/(2*self.R)
         return vR, vL
 
-    #not sure
+    #not used at all
     def diffToUni(self, vR, vL):
         v = self.R/2*(vR+vL)
         w = self.R/self.L*(vR-vL)
@@ -101,8 +102,11 @@ class Controller():
         # alpha = g_theta - math.radians(90)
         e = np.arctan2(np.sin(alpha), np.cos(alpha))
 
+        #proportional = new error
         e_P = e
+        #integral = error + new error
         e_I = self.E + e
+        #derivative = new error - old error
         e_D = e - self.old_e
 
         # This PID controller only calculates the angular
@@ -113,8 +117,11 @@ class Controller():
 
         w = np.arctan2(np.sin(w), np.cos(w))
 
+        #adds error to culmative error
         self.E = self.E + e
+        #updates previous errorhhhh
         self.old_e = e
+        #returns angular velocity?
         v = self.desiredV
 
         return v, w
@@ -123,6 +130,7 @@ class Controller():
     def fixAngle(self, angle):
         return np.arctan2(np.sin(angle), np.cos(angle))
 
+    #akin to motor.spin, actually changes the position of the robot using the calculations from iteratePID
     def makeAction(self, v, w):
         x_dt = v*np.cos(self.current.theta)
         y_dt = v*np.sin(self.current.theta)
@@ -130,8 +138,7 @@ class Controller():
 
         self.current.x = self.current.x + x_dt * self.dt
         self.current.y = self.current.y + y_dt * self.dt
-        self.current.theta = self.fixAngle(
-            self.current.theta + self.fixAngle(theta_dt * self.dt))
+        self.current.theta = self.fixAngle(self.current.theta + self.fixAngle(theta_dt * self.dt))
         return
 
     #checks if at the goal
@@ -149,10 +156,14 @@ class Controller():
             return False
 
     def runPID(self, myPlot=None):
+        #sets the current x, y, and theta arrays to the current location
         x = [self.current.x]
         y = [self.current.y]
         theta = [self.current.theta]
+
+        #continues looping until arriving at the target point
         while(not self.isArrived()):
+            #run the pid action
             v, w = self.iteratePID()
             self.makeAction(v, w)
             x.append(self.current.x)
@@ -171,16 +182,24 @@ class Controller():
 
 
 def trackRoute(start, targets):
+    #initalize the current variable to be at the start point
+    #x, y, and theta are arrays that hold the various points of the robot for drawing the graph at the end
     current = start
     x = []
     y = []
     theta = []
+
+    #loops through all the target points in the targets array
     for target in targets:
+        #initalize the controller object as an object of the controller class with the current location and target location
         controller = Controller(current, target)
+        #runs the pid for the current movement
         x_, y_, theta_ = controller.runPID()
+        #updates the arrays with all the new x, y, theta values from the pid in this loop
         x.extend(x_)
         y.extend(y_)
         theta.extend(theta_)
+        #updates current to have the new current location
         current = controller.current
     return x, y, theta
 
@@ -191,12 +210,17 @@ def main():
     # In every iteration, get an action from PID and make the action,
     # after that, sleep for dt. Repeat that loop until reaching the goal state.
 
+    #define the starting point, np.radians = 90 degrees converted to radians
     start = targetPoint(0, 0, np.radians(90))
 
+    #initalize the targets array with points for the map to go to
     targets = [targetPoint(0,40,0), targetPoint(40,20,0), targetPoint(-10,-20,0), targetPoint(-20,15, 0), targetPoint(0,3,0)]
+    #starts the loop for the robot to travel to each point
     x, y, theta = trackRoute(start, targets)
 
+    #define the object lines as a myPlot object
     lines = myPlot()
+    #draws the plot
     lines.drawPlot(x, y, theta)
 
 
