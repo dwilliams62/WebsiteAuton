@@ -46,6 +46,16 @@ void MoveBot(double d, int mTime) {
   isPID = false;
 }
 
+//rotate the bot
+void RotateBot(double d, int tTime = 1000) {
+  setTurning = d;
+  resetTurning = true;
+  isTurning = true;
+  wait(tTime,msec);
+  isTurning = false;
+  wait(20,msec);
+}
+
 //the distance is in revolutions, the encoders should only be reset on first use
 void runPID(double pidSetDegrees, bool resetEncoders = false, bool isTurning = false) {
   if (resetEncoders) {
@@ -81,6 +91,67 @@ void runPID(double pidSetDegrees, bool resetEncoders = false, bool isTurning = f
   else {
     SpinMotors(0);
   }
+}
+
+void GoToPoint2(double x, double y, double tTime = 1000, double mTime = 1000) {
+  changeX = x - xSelf;
+  changeY = y - ySelf;
+  requiredDistance = sqrt((changeX * changeX) + (changeY * changeY));
+
+  goalAngle = asin(changeX / requiredDistance);
+  if (goalAngle < 0) { goalAngle *= -1; }
+
+  if (changeX == 0 && changeY > 0) {goalAngle = 0;}
+  else if (changeX > 0 && changeY == 0) { goalAngle = 1.5708; }
+  else if (changeX == 0 && changeY < 0) { goalAngle = 3.14159; }
+  else if (changeX < 0 && changeY == 0) { goalAngle = 4.71239; }
+  else if (changeX > 0 && changeY < 0) { goalAngle += 1.5708; }
+  else if (changeX < 0 && changeY < 0) { goalAngle += 3.14159; }
+  else if (changeX < 0 && changeY > 0) { goalAngle += 4.71239; }
+
+  requiredAngle = goalAngle - tSelf;
+  if (requiredAngle > 180) { requiredAngle = (360 - requiredAngle) * -1; }
+
+  RotateBot(ConvertRadiansToDegrees(requiredAngle),tTime);
+  MoveBot(requiredDistance,mTime);
+
+  xSelf = x;
+  ySelf = y;
+  tSelf = goalAngle;
+
+  Brain.Screen.print(xSelf);
+  Brain.Screen.print(" , ");
+  Brain.Screen.print(ySelf);
+  Brain.Screen.print(" , ");
+  Brain.Screen.print(tSelf);
+  Brain.Screen.newLine(); 
+  //  //calculate distance  
+  // x_c = x_g - x_s;
+  // y_c = y_g - y_s;
+  // requiredDistance = sqrt((x_c * x_c) + (y_c * y_c));
+
+  // //calculate required rotation if any
+  // goalAngle = asin(x_c / requiredDistance) * 57.2958;
+  // requiredAngle = goalAngle - currentAngle;
+
+  // //if angle is more than 2 degrees, turns the robot
+  // if (fabs(requiredAngle) > 2) {
+  //   setTurning = requiredAngle;
+  //   resetTurning = true;
+  //   isTurning = true;
+  //   wait(fabs(requiredAngle) * 100, msec);
+  //   isTurning = false;
+  //   currentAngle = currentAngle + requiredAngle;
+  // }
+
+  // //moves the required distance
+  // setPID = requiredDistance;
+  // resetPID = true;
+  // isPID = true;
+  // wait(fabs(requiredDistance) * 100,msec);
+  // isPID = false;
+  // x_s += x_c;
+  // y_s += y_c;
 }
 
 //auton controller
