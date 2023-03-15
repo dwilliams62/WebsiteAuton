@@ -94,13 +94,17 @@ void runPID(double pidSetDegrees, bool resetEncoders = false, bool isTurning = f
 }
 
 void GoToPoint2(double x, double y, double tTime = 1000, double mTime = 1000) {
+  //calculate the distance the bot will have to travel
   changeX = x - xSelf;
   changeY = y - ySelf;
   requiredDistance = sqrt((changeX * changeX) + (changeY * changeY));
 
+  //calculate the goal angle
   goalAngle = asin(changeX / requiredDistance);
   if (goalAngle < 0) { goalAngle *= -1; }
 
+  //change the quadrant to which one is needed based on the change of x and the change of y
+  //if it lands on an axis it just changes the goal angle to that axis degree (in radians) 
   if (changeX == 0 && changeY > 0) {goalAngle = 0;}
   else if (changeX > 0 && changeY == 0) { goalAngle = 1.5708; }
   else if (changeX == 0 && changeY < 0) { goalAngle = 3.14159; }
@@ -109,49 +113,26 @@ void GoToPoint2(double x, double y, double tTime = 1000, double mTime = 1000) {
   else if (changeX < 0 && changeY < 0) { goalAngle += 3.14159; }
   else if (changeX < 0 && changeY > 0) { goalAngle += 4.71239; }
 
+  //calculates how far the bot actually needs to spin, if it is more than 180 it moves the opposite way
   requiredAngle = goalAngle - tSelf;
   if (requiredAngle > 180) { requiredAngle = (360 - requiredAngle) * -1; }
 
+  //rotate the bot then move the bot
   RotateBot(ConvertRadiansToDegrees(requiredAngle),tTime);
   MoveBot(requiredDistance,mTime);
 
+  //update where the bot is
   xSelf = x;
   ySelf = y;
   tSelf = goalAngle;
 
+  //print out where the robot should be on the screen
   Brain.Screen.print(xSelf);
   Brain.Screen.print(" , ");
   Brain.Screen.print(ySelf);
   Brain.Screen.print(" , ");
-  Brain.Screen.print(tSelf);
-  Brain.Screen.newLine(); 
-  //  //calculate distance  
-  // x_c = x_g - x_s;
-  // y_c = y_g - y_s;
-  // requiredDistance = sqrt((x_c * x_c) + (y_c * y_c));
-
-  // //calculate required rotation if any
-  // goalAngle = asin(x_c / requiredDistance) * 57.2958;
-  // requiredAngle = goalAngle - currentAngle;
-
-  // //if angle is more than 2 degrees, turns the robot
-  // if (fabs(requiredAngle) > 2) {
-  //   setTurning = requiredAngle;
-  //   resetTurning = true;
-  //   isTurning = true;
-  //   wait(fabs(requiredAngle) * 100, msec);
-  //   isTurning = false;
-  //   currentAngle = currentAngle + requiredAngle;
-  // }
-
-  // //moves the required distance
-  // setPID = requiredDistance;
-  // resetPID = true;
-  // isPID = true;
-  // wait(fabs(requiredDistance) * 100,msec);
-  // isPID = false;
-  // x_s += x_c;
-  // y_s += y_c;
+  Brain.Screen.print(ConvertRadiansToDegrees(tSelf));
+  Brain.Screen.newLine();
 }
 
 //auton controller
