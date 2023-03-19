@@ -186,3 +186,36 @@ int userController() {
 
   return 1;
 }
+
+void SpinLeftMotors(double power, bool isReverse = false) {
+  if (isReverse) {
+    lMotor1.spin(reverse, power, pct); lMotor2.spin(reverse, power, pct);
+    lMotor3.spin(reverse, power, pct); lMotor4.spin(reverse, power, pct);
+  }
+  else {
+    lMotor1.spin(forward, power, pct); lMotor2.spin(forward, power, pct);
+    lMotor3.spin(forward, power, pct); lMotor4.spin(forward, power, pct);
+  }
+}
+
+void SpinRightMotors(double power, bool isReverse = false) {
+  if (isReverse) {
+    rMotor1.spin(reverse, power, pct); rMotor2.spin(reverse, power, pct);
+    rMotor3.spin(reverse, power, pct); rMotor4.spin(reverse, power, pct);
+  }
+  else {
+    rMotor1.spin(forward, power, pct); rMotor2.spin(forward, power, pct);
+    rMotor3.spin(forward, power, pct); rMotor4.spin(forward, power, pct);
+  }
+}
+
+double xSelfLeft = 0, xSelfRight = 0;
+
+void TurnAndMove(double x, double y) {
+  if (x == xSelf || y == ySelf) {
+    GoToPoint2(x,y);
+  }
+  else {
+    
+  }
+}
