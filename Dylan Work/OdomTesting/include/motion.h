@@ -10,7 +10,8 @@ double power = 0, sensorValue = 0, lSensor = 0, rSensor = 0;
 //variables for the auton task
 static bool isAuton = false, isPID = false, isTurning = false, isFlywheel = false, isUser = false; 
 static bool resetPID = true, resetTurning = true, resetFlywheel = true;
-static double setPID = 0, setTurning = 0, setFlywheel = 0;
+static bool isPIDLeft = false, isPIDRight = false, resetPIDSplit = false;
+static double setPID = 0, setTurning = 0, setPIDLeft = 0, setPIDRight = 0;
 
 //spin the motors for pid
 void SpinMotors(double power, bool isTurning = false) {
@@ -44,6 +45,16 @@ void MoveBot(double d, int mTime) {
   setPID = 0;
   wait(20,msec);
   isPID = false;
+}
+
+void MoveAndTurnBot(double l, double r, int mTime) {
+  setPIDLeft = l; setPIDRight = r;
+  resetPIDSplit = true;
+  isPIDLeft = true; isPIDRight = true;
+  wait(mTime,msec);
+  setPIDLeft = 0; setPIDRight = 0;
+  wait(20,msec);
+  isPIDLeft = false; isPIDRight = false;
 }
 
 //rotate the bot
@@ -90,6 +101,76 @@ void runPID(double pidSetDegrees, bool resetEncoders = false, bool isTurning = f
   }
   else {
     SpinMotors(0);
+  }
+}
+
+void runPIDLeft(double pidSetDegrees, bool resetEncoders = false, bool isTurning = false) {
+  if (resetEncoders) {
+    resetEncoders = false;
+    lMotor1.setPosition(0, degrees); lMotor2.setPosition(0, degrees); lMotor3.setPosition(0, degrees); lMotor4.setPosition(0, degrees);
+    integral = 0;
+    derivative = 0;
+  }
+
+  if (pidSetDegrees != 0) {
+    lSensor = (lMotor1.position(degrees) + lMotor2.position(degrees) + 
+      lMotor3.position(degrees) + lMotor4.position(degrees)) / 4;
+    if (isTurning) {sensorValue = lSensor;}
+    else {sensorValue = lSensor;}
+    error = pidSetDegrees - sensorValue;
+
+    integral = integral + error;
+    if (fabs(integral) > 5000) {integral = 5000;}
+
+    derivative = error - prevError;
+    prevError = error;
+
+    power = error * kP + integral * kI + derivative * kD;
+    if (power > 33.5) {power = 33.5;}
+    if (power < -33.5) {power = -33.5;}
+  
+    if (isTurning) {SpinMotors(power, true);}
+    else {lMotor1.spin(fwd,power,pct); lMotor2.spin(fwd,power,pct);
+            lMotor3.spin(fwd,power,pct); lMotor4.spin(fwd,power,pct);}
+  }
+  else {
+    lMotor1.spin(fwd,0,pct); lMotor2.spin(fwd,0,pct);
+    lMotor3.spin(fwd,0,pct); lMotor4.spin(fwd,0,pct);
+  }
+}
+
+void runPIDRight(double pidSetDegrees, bool resetEncoders = false, bool isTurning = false) {
+  if (resetEncoders) {
+    resetEncoders = false;
+    rMotor1.setPosition(0, degrees); rMotor2.setPosition(0, degrees); rMotor3.setPosition(0, degrees); rMotor4.setPosition(0, degrees);
+    integral = 0;
+    derivative = 0;
+  }
+
+  if (pidSetDegrees != 0) {
+    rSensor = (rMotor1.position(degrees) + rMotor2.position(degrees) + 
+      rMotor3.position(degrees) + rMotor4.position(degrees)) / 4;
+    if (isTurning) {sensorValue = rSensor;}
+    else {sensorValue = rSensor;}
+    error = pidSetDegrees - sensorValue;
+
+    integral = integral + error;
+    if (fabs(integral) > 5000) {integral = 5000;}
+
+    derivative = error - prevError;
+    prevError = error;
+
+    power = error * kP + integral * kI + derivative * kD;
+    if (power > 33.5) {power = 33.5;}
+    if (power < -33.5) {power = -33.5;}
+  
+    if (isTurning) {SpinMotors(power, true);}
+    else {rMotor1.spin(fwd,power,pct); rMotor2.spin(fwd,power,pct);
+            rMotor3.spin(fwd,power,pct); rMotor4.spin(fwd,power,pct);}
+  }
+  else {
+    rMotor1.spin(fwd,0,pct); rMotor2.spin(fwd,0,pct);
+    rMotor3.spin(fwd,0,pct); rMotor4.spin(fwd,0,pct);
   }
 }
 
@@ -155,6 +236,16 @@ int autonController() {
         resetTurning = false;
       }
       else {runPID(setTurning, false, true);}
+    }
+
+    if (isPIDLeft && isPIDRight) {
+      if (resetPIDSplit) {
+        setPIDLeft = ConvertInchesToRevolutions(setPIDLeft);
+        setPIDRight = ConvertInchesToRevolutions(setPIDRight);
+        runPIDLeft(setPIDLeft,true);
+        runPIDRight(setPIDRight,true);
+        resetPIDSplit = false;
+      }
     }
 
     wait(10, msec);
