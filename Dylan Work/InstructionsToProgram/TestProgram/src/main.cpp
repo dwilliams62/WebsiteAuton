@@ -14,6 +14,9 @@ void autonomous(void) {
 	RotateBot(180);
 	GoToPoint(115,115);
 	GoToPoint(1,1);
+	GoToPoint(20,20);
+	GoToPoint(2000,2000);
+	RotateBot(2000);
   //end website provided code
 }
 void usercontrol(void) {
