@@ -104,7 +104,5 @@ int main() {
   pre_auton();
 
   // Prevent main from exiting with an infinite loop.
-  while (true) {
-    wait(100, msec);
-  }
+  while (true) {wait(100, msec);}
 }
