@@ -1,7 +1,4 @@
 Move,5,27,
-Rotate,5,5,180
-Move,115,115,205
-Move,1,1,205
-Move,20,20,90
-Move,2000,2000,90
-Rotate,5,5,2000
+Rotate,0,0,180
+Move,3,5,0
+Rotate,0,0,205

@@ -10,14 +10,12 @@ void autonomous(void) {
   isAuton = true; resetPID = true; resetTurning = true; resetFlywheel = true; isUser = false;
   task StartAuton(autonController);
   //start website provided code
-	GoToPoint(5,27);
-	RotateBot(180);
-	GoToPoint(115,115);
-	GoToPoint(1,1);
-	GoToPoint(20,20);
-	GoToPoint(2000,2000);
-	RotateBot(2000);
+	GoToPoint(10,5);
+	RotateBot(45);
+	GoToPoint(-5,5);
+	RotateBot(-30);
   //end website provided code
+  SpinMotors(0);
 }
 void usercontrol(void) {
   isAuton = false; resetPID = true; resetTurning = true; resetFlywheel = true; isUser = true;

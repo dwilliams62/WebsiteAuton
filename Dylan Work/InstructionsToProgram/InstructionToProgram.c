@@ -24,7 +24,7 @@ int main(int argc, char **argv)
 	char tSpot[8];
 	
 	//open the csv file with the instructions, and create a new main in the given VEXcode project
-	if ((inputFile = open("testCSV.csv", O_RDONLY, 0777)) == -1) {
+	if ((inputFile = open("pathing.csv", O_RDONLY, 0777)) == -1) {
 		err_sys("Error Opening Input File!");
 	}
 	if ((outputFile = open("TestProgram/src/main.cpp", O_WRONLY|O_CREAT|O_TRUNC, 0777)) == -1) {
@@ -111,6 +111,7 @@ int main(int argc, char **argv)
 	
 	//adds the end of the code that will always be there, includes functionality for drive mode if so desired
 	printf("%s\n", "  //end website provided code");
+	printf("%s\n", "  SpinMotors(0);");
 	printf("%s\n", "}");
 	printf("%s\n", "void usercontrol(void) {");
 	printf("%s\n", "  isAuton = false; resetPID = true; resetTurning = true; resetFlywheel = true; isUser = true;");

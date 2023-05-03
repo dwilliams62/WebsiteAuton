@@ -1,21 +1,58 @@
 #include "robot-config.h"
 #include "vex.h"
+#include <math.h>
 
 //variables for pid
-double kP = 0.468, kI = 0, kD = 0.048;
+double kP = 0.1775, kI = 0, kD = 0.01775;
 double error = 0, prevError = 0, integral = 0, derivative = 0;
 double power = 0, sensorValue = 0, lSensor = 0, rSensor = 0;
+
+//variables for the odometry
+double xSelf = 0, ySelf = 0, tSelf = 0, xCurrent = 0, yCurrent = 0;
+double goalAngle, requiredAngle, requiredDistance;
+double changeAngle, changeX, changeY;
 
 //variables for the auton task
 static bool isAuton = false, isPID = false, isTurning = false, isFlywheel = false, isUser = false; 
 static bool resetPID = true, resetTurning = true, resetFlywheel = true;
-static double setPID = 0, setTurning = 0, setFlywheel = 0;
+static bool isReloading = false;
+static double setPID = 0, setTurning = 0, setPIDLeft = 0, setPIDRight = 0, reloadTime = 0;
 
-//auton variables
-double goalAngle, requiredAngle, currentAngle, requiredDistance, x_c, y_c, x_s = 0, y_s = 0;
+//convert degrees to inches
+double ConvertDegreesToInches(double setDegrees, double turnDiameter = 12.17) {
+  double requiredInches = setDegrees / 360.0 * M_PI * turnDiameter;
+  return requiredInches;
+}
 
-//user variable
-double shootingCounter = 6400;
+//convert the inches to revolutions
+double ConvertInchesToRevolutions(double requiredInches, double circum = 3.86) {
+  double circumferenceOfWheel = circum * M_PI;
+  double outputRat = 3.0/5.0;
+  double requiredRevolutions = (requiredInches / circumferenceOfWheel) * outputRat * 360.0;
+  return requiredRevolutions;
+}
+
+//convert radians to degrees
+double ConvertRadiansToDegrees(double radian) {
+  radian = radian * (180.0 / M_PI);
+  return radian;
+}
+
+double CalculateWaitTimeMove(double n) {
+  n = 0.05 * n; n += 0.75; return n;
+}
+
+double CalculateWaitTimeRotate(double n) {
+  n = 0.005 * n; n += 0.75; return n;
+}
+
+//reset all the encoders
+void ResetEncoders() {
+  lMotor1.setPosition(0,degrees); lMotor2.setPosition(0,degrees);
+  lMotor3.setPosition(0,degrees); lMotor4.setPosition(0,degrees);
+  rMotor1.setPosition(0,degrees); rMotor2.setPosition(0,degrees);
+  rMotor3.setPosition(0,degrees); rMotor4.setPosition(0,degrees);
+}
 
 //spin the motors for pid
 void SpinMotors(double power, bool isTurning = false) {
@@ -33,23 +70,9 @@ void SpinMotors(double power, bool isTurning = false) {
   }
 }
 
-//convert degrees to inches
-double ConvertDegreesToInches(double setDegrees, double turnDiameter = 12.17) {
-  double requiredInches = setDegrees / 360.0 * M_PI * turnDiameter;
-  return requiredInches;
-}
-
-//convert the inches to revolutions
-double ConvertInchesToRevolutions(double requiredInches) {
-  double circumferenceOfWheel = 3.5 * M_PI;
-  double outputRat = 3.0/5.0;
-  double requiredRevolutions = (requiredInches / circumferenceOfWheel) * outputRat * 360.0;
-  return requiredRevolutions;
-}
-
 //spins the rollers
 void SpinRoller(double t = 200) {
-  intakeRollerMotor.spin(reverse,100,pct);
+  intakeRollerMotor.spin(reverse,15,pct);
   wait(t,msec); //replace with color sensor
   intakeRollerMotor.spin(reverse,0,pct);
 }
@@ -59,9 +82,11 @@ void MoveBot(double d, int mTime = 1000) {
   setPID = d;
   resetPID = true;
   isPID = true;
-  wait(mTime,msec);
-  isPID = false;
+  if (d < 0) { d*= -1; }
+  wait(CalculateWaitTimeMove(d),sec);
+  setPID = 0;
   wait(20,msec);
+  isPID = false;
 }
 
 //rotate the bot
@@ -69,7 +94,9 @@ void RotateBot(double d, int tTime = 1000) {
   setTurning = d;
   resetTurning = true;
   isTurning = true;
-  wait(tTime,msec);
+  if (d < 0) { d*= -1; }
+  wait(CalculateWaitTimeRotate(d), sec);
+  setTurning = 0;
   isTurning = false;
   wait(20,msec);
 }
@@ -83,9 +110,9 @@ void IntakeDiscs(bool turnOff = false) {
 //emptys the bot of all discs
 void ShootDiscs() {
   SpinMotors(0);
-  cataMotor.spin(fwd, 50, pct);
-  wait(6100,msec);
-  cataMotor.spin(fwd,0,pct);
+  reloadTime = 0;
+  isReloading = true;
+  wait(1000,msec);
 }
 
 //auton endgame deployment
@@ -100,71 +127,77 @@ void EndgameDeploy() {
 void runPID(double pidSetDegrees, bool resetEncoders = false, bool isTurning = false) {
   if (resetEncoders) {
     resetEncoders = false;
-    lMotor1.setPosition(0, degrees); lMotor2.setPosition(0, degrees); lMotor3.setPosition(0, degrees); lMotor4.setPosition(0, degrees);
-    rMotor1.setPosition(0, degrees); rMotor2.setPosition(0, degrees); rMotor3.setPosition(0, degrees); rMotor4.setPosition(0, degrees);
+    ResetEncoders();
     integral = 0;
     derivative = 0;
-    Brain.Screen.print("reset");
   }
 
-  lSensor = (lMotor1.position(degrees) + lMotor2.position(degrees) + 
-    lMotor3.position(degrees) + lMotor4.position(degrees)) / 4;
-  rSensor = (rMotor1.position(degrees) + rMotor2.position(degrees) + 
-    rMotor3.position(degrees) + rMotor4.position(degrees)) / 4;
-  if (isTurning) {sensorValue = rSensor;}
-  else {sensorValue = (lSensor + rSensor) / 2;}
-  error = pidSetDegrees - sensorValue;
+  if (pidSetDegrees != 0) {
+    lSensor = (lMotor1.position(degrees) + lMotor2.position(degrees) + 
+      lMotor3.position(degrees) + lMotor4.position(degrees)) / 4;
+    rSensor = (rMotor1.position(degrees) + rMotor2.position(degrees) + 
+      rMotor3.position(degrees) + rMotor4.position(degrees)) / 4;
+    if (isTurning) {sensorValue = rSensor;}
+    else {sensorValue = (lSensor + rSensor) / 2;}
+    error = pidSetDegrees - sensorValue;
 
-  integral = integral + error;
-  if (fabs(integral) > 5000) {integral = 500;}
+    integral = integral + error;
+    if (fabs(integral) > 5000) {integral = 5000;}
 
-  derivative = error - prevError;
-  prevError = error;
+    derivative = error - prevError;
+    prevError = error;
 
-  power = error * kP + integral * kI + derivative * kD;
-  if (power > 33.5) {power = 33.5;}
-  if (power < -33.5) {power = -33.5;}
-
-  if (isTurning) {SpinMotors(power, true);}
-  else {SpinMotors(power);}
+    power = error * kP + integral * kI + derivative * kD;
+    if (power > 33.5) {power = 33.5;}
+    if (power < -33.5) {power = -33.5;}
+  
+    if (isTurning) {SpinMotors(power, true);}
+    else {SpinMotors(power);}
+  }
+  else {
+    SpinMotors(0);
+  }
 }
 
-//odometry function
-void GoToPoint(double x_g, double y_g, int tTime = 1000, int mTime = 1000) {
-  //calculate distance  
-  x_c = x_g - x_s;
-  y_c = y_g - y_s;
-  requiredDistance = sqrt((x_c * x_c) + (y_c * y_c));
+void GoToPoint(double x, double y, double tTime = 5000, double mTime = 5000) {
+  //calculate the distance the bot will have to travel
+  changeX = x - xSelf;
+  changeY = y - ySelf;
+  requiredDistance = sqrt((changeX * changeX) + (changeY * changeY));
 
-  //calculate required rotation if any
-  goalAngle = asin(x_c / requiredDistance) * 57.2958;
-  requiredAngle = goalAngle - currentAngle;
+  //calculate the goal angle
+  goalAngle = asin(changeX / requiredDistance);
+  if (goalAngle < 0) { goalAngle *= -1; }
 
-  //if angle is more than 2 degrees, turns the robot
-  if (fabs(requiredAngle) > 2) {
-    setTurning = requiredAngle;
-    resetTurning = true;
-    isTurning = true;
-    wait(tTime, msec);
-    isTurning = false;
-    currentAngle = currentAngle + requiredAngle;
-  }
+  //change the quadrant to which one is needed based on the change of x and the change of y
+  //if it lands on an axis it just changes the goal angle to that axis degree (in radians) 
+  if (changeX == 0 && changeY > 0) {goalAngle = 0;}
+  else if (changeX > 0 && changeY == 0) { goalAngle = 1.5708; }
+  else if (changeX == 0 && changeY < 0) { goalAngle = 3.14159; }
+  else if (changeX < 0 && changeY == 0) { goalAngle = 4.71239; }
+  else if (changeX > 0 && changeY < 0) { goalAngle += 1.5708; }
+  else if (changeX < 0 && changeY < 0) { goalAngle += 3.14159; }
+  else if (changeX < 0 && changeY > 0) { goalAngle += 4.71239; }
 
-  //moves the required distance
-  setPID = requiredDistance;
-  resetPID = true;
-  isPID = true;
-  wait(mTime,msec);
-  isPID = false;
-  x_s += x_c;
-  y_s += y_c;
+  //calculates how far the bot actually needs to spin, if it is more than 180 it moves the opposite way
+  requiredAngle = goalAngle - tSelf;
+  if (requiredAngle > 180) { requiredAngle = (360 - requiredAngle) * -1; }
 
-  //show the current location and rotation based off starting rotation
-  Brain.Screen.print(x_s);
+  //rotate the bot then move the bot
+  RotateBot(ConvertRadiansToDegrees(requiredAngle),tTime);
+  MoveBot(requiredDistance,mTime);
+
+  //update where the bot is
+  xSelf = x;
+  ySelf = y;
+  tSelf = goalAngle;
+
+  //print out where the robot should be on the screen
+  Brain.Screen.print(xSelf);
   Brain.Screen.print(" , ");
-  Brain.Screen.print(y_s);
+  Brain.Screen.print(ySelf);
   Brain.Screen.print(" , ");
-  Brain.Screen.print(currentAngle);
+  Brain.Screen.print(ConvertRadiansToDegrees(tSelf));
   Brain.Screen.newLine();
 }
 
@@ -173,7 +206,7 @@ int autonController() {
   while(isAuton) {
     if (isPID) {
       if (resetPID) {
-        setPID = ConvertInchesToRevolutions(setPID);
+        setPID = ConvertInchesToRevolutions(setPID, 1.13);
         runPID(setPID, true);
         resetPID = false;
       }
@@ -182,12 +215,23 @@ int autonController() {
 
     if (isTurning) {
       if (resetTurning) {
-        setTurning = ConvertDegreesToInches(setTurning, 13.65);
-        setTurning = ConvertInchesToRevolutions(setTurning);
+        setTurning = ConvertDegreesToInches(setTurning, 13);
+        setTurning = ConvertInchesToRevolutions(setTurning, 1.13);
         runPID(setTurning, true, true);
         resetTurning = false;
       }
       else {runPID(setTurning, false, true);}
+    }
+
+    if (isReloading) {
+      if (reloadTime > 3120) {
+        cataMotor.spin(forward, 0, pct);
+        isReloading = false;
+      }
+      else {
+        reloadTime += 10;
+        cataMotor.spin(forward, 100, pct);
+      }
     }
 
     wait(10, msec);
@@ -219,7 +263,7 @@ int userController() {
       intakeRollerMotor.spin(fwd, 100, pct);
     }
     else if (Controller1.ButtonL2.pressing()) {
-      intakeRollerMotor.spin(fwd, 70, pct);
+      intakeRollerMotor.spin(reverse, 70, pct);
     }
     else {
       intakeRollerMotor.stop(brakeType::coast);
@@ -231,20 +275,6 @@ int userController() {
     }
     else {
       endGame.set(false);
-    }
-
-    // if (Controller1.ButtonA.pressing()) {
-    //   endGame.set(false);
-    // }
-
-    if (Controller1.ButtonR1.pressing()) {
-      cataMotor.spin(fwd,100,pct);
-    }
-    else if (Controller1.ButtonR2.pressing()) {
-      cataMotor.spin(fwd,40,pct);
-    }
-    else {
-      cataMotor.spin(fwd,0,pct);
     }
 
     wait(10,msec);
